@@ -76,7 +76,7 @@ int switchOverclock() {
 }
 
 int thread(SceSize args, void *argp) {
-    
+  
   alive = 1;
   int init = 0;
   u64 lastTime = 0;

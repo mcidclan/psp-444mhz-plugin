@@ -33,6 +33,7 @@
     : "r"(var)              \
   )
 
+#define DEFAULT_FREQUENCY     333
 #define THEORETICAL_FREQUENCY 444
 #define PLL_MUL_MSB           0x0124
 #define PLL_RATIO_INDEX       5
@@ -43,22 +44,23 @@
 static inline void setOverclock() {
   
   // note: needs to be 333 to be able to reach 444mhz
-  const int INITIAL_FREQUENCY = 333;
+  const int INITIAL_FREQUENCY = DEFAULT_FREQUENCY;
   
   scePowerSetClockFrequency(INITIAL_FREQUENCY, INITIAL_FREQUENCY, INITIAL_FREQUENCY/2);
 
   const u32 den = 19;
   const float base = 37;
+  
   const u32 num = (u32)(((float)(THEORETICAL_FREQUENCY * den)) / base);
   u32 _num = (u32)(((float)(INITIAL_FREQUENCY * den)) / base);
   
   int intr;
   suspendCpuIntr(intr);
 
-  // throttle all clock domains before overclocking PLL
-  hw(0xbc200000) = 32 << 16 | 511;
-  hw(0xBC200004) = 32 << 16 | 511;
-  hw(0xBC200008) = 32 << 16 | 511;
+  // set clock domains to ratio 1:1
+  hw(0xbc200000) = 511 << 16 | 511;
+  hw(0xBC200004) = 511 << 16 | 511;
+  hw(0xBC200008) = 511 << 16 | 511;
   sync();
   
   // set bit bit 7 to apply index, wait until hardware clears it
@@ -77,14 +79,8 @@ static inline void setOverclock() {
     _num++;
   }
 
-  // unthrottle all clock domains after overclocking PLL
-  hw(0xbc200000) = 511 << 16 | 511;
-  hw(0xBC200004) = 511 << 16 | 511;
-  hw(0xBC200008) = 511 << 16 | 511;
-  sync();
-
   // wait for clock stability, signal propagation and pipeline drain
-  u32 i = 0xfffff;
+  u32 i = 0x1fffff;
   while (--i) {
     delayPipeline();
   }
@@ -94,54 +90,54 @@ static inline void setOverclock() {
 
 static inline void cancelOverclock() {
   
-  const int TARGET_FREQUENCY = 333;
+  const int TARGET_FREQUENCY = DEFAULT_FREQUENCY;
   
   const u32 den = 19;
   const float base = 37;
 
   const u32 num = (u32)(((float)(TARGET_FREQUENCY * den)) / base);
-  u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * den)) / base);
   
   int intr;
   suspendCpuIntr(intr);
-  
-  const u32 index = 2;
-  hw(0xbc200000) = 32 << 16 | 511;
-  hw(0xBC200004) = 32 << 16 | 511;
-  hw(0xBC200008) = 32 << 16 | 511;
-  sync();
-  
-  hw(0xbc100068) = 0x80 | index;
-  do {
-    delayPipeline();
-  } while (hw(0xbc100068) != index);
-  
-  while (_num > num) {
-    const u32 lsb = _num << 8 | den;
-    const u32 multiplier = (PLL_MUL_MSB << 16) | lsb;
-    hw(0xbc1000fc) = multiplier;
-    delayPipeline();
-    _num--;
-  }
 
-  hw(0xbc100068) = 0x80 | PLL_RATIO_INDEX;
-  do {
-    delayPipeline();
-  } while (hw(0xbc100068) != PLL_RATIO_INDEX);
+  const u32 pllMul = hw(0xbc1000fc);
+  const u32 msb = pllMul & 0xffff;
+  const u32 _den = msb & 0xff;
+  u32 _num = msb >> 8;
+  
+  const int overclocked = (int)(_den && ((_num / _den) > 10));
 
-  hw(0xbc200000) = 511 << 16 | 511;
-  hw(0xBC200004) = 511 << 16 | 511;
-  hw(0xBC200008) = 511 << 16 | 511;
-  sync();
+  if (overclocked) {
+    
+    hw(0xbc200000) = 511 << 16 | 511;
+    hw(0xBC200004) = 511 << 16 | 511;
+    hw(0xBC200008) = 511 << 16 | 511;
+    sync();
+    
+    while (_num > num) {
+      _num--;
+      const u32 lsb = _num << 8 | den;
+      const u32 multiplier = (PLL_MUL_MSB << 16) | lsb;
+      hw(0xbc1000fc) = multiplier;
+      delayPipeline();
+    }
 
-  u32 i = 0xfffff;
-  while (--i) {
-    delayPipeline();
+    hw(0xbc100068) = 0x80 | PLL_RATIO_INDEX;
+    do {
+      delayPipeline();
+    } while (hw(0xbc100068) != PLL_RATIO_INDEX);
+
+    u32 i = 0x1fffff;
+    while (--i) {
+      delayPipeline();
+    }
   }
   
   resumeCpuIntr(intr);
-  
-  scePowerSetClockFrequency(TARGET_FREQUENCY, TARGET_FREQUENCY, TARGET_FREQUENCY/2);
+
+  if (overclocked) {
+    scePowerSetClockFrequency(TARGET_FREQUENCY, TARGET_FREQUENCY, TARGET_FREQUENCY/2);
+  }
 }
 
 
