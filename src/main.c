@@ -11,10 +11,10 @@
 
 PSP_MODULE_INFO("expover-plugin", 0x1000, 1, 1);
 PSP_NO_CREATE_MAIN_THREAD();
-PSP_HEAP_SIZE_KB(1024);
+PSP_HEAP_SIZE_KB(512);
 
 int thid, alive = 0;
-int delay = 0, lastFreq = 333;
+int delay = 0, lastFreq = DEFAULT_FREQUENCY;
 
 static inline int displaySetFrameBuf(void *fbuf, int width, int format, int sync) {
   
@@ -37,7 +37,7 @@ static inline int displaySetFrameBuf(void *fbuf, int width, int format, int sync
         u32 color;
         
         int isInner = (x >= 8 && x < 24 && y >= 8 && y < 24);
-        int isWhite = (lastFreq == 444) ? !isInner : isInner;
+        int isWhite = (lastFreq == THEORETICAL_FREQUENCY) ? !isInner : isInner;
         color = isWhite ? ((bytesPerPixel == 4) ? 0xFFFFFFFF : 0xFFFF) : 0;
       
         if (bytesPerPixel == 4) {
@@ -62,7 +62,7 @@ int switchOverclock() {
   sceCtrlPeekBufferPositive(&ctl, 1);
   if (
     !switched &&
-    (ctl.Buttons & PSP_CTRL_SELECT) &&
+    (ctl.Buttons & PSP_CTRL_NOTE) &&
     (ctl.Buttons & PSP_CTRL_LTRIGGER) &&
     (ctl.Buttons & PSP_CTRL_RTRIGGER)
   ) {
@@ -100,13 +100,13 @@ int thread(SceSize args, void *argp) {
       
       if (delay == 0 && switching) {
         
-        const int freq = lastFreq == 444 ? 333 : 444;
-        if (freq == 444) {
+        const int freq = lastFreq == THEORETICAL_FREQUENCY ? DEFAULT_FREQUENCY : THEORETICAL_FREQUENCY;
+        if (freq == THEORETICAL_FREQUENCY) {
           setOverclock();
-          lastFreq = 444;
+          lastFreq = THEORETICAL_FREQUENCY;
         } else {
           cancelOverclock();
-          lastFreq = 333;
+          lastFreq = DEFAULT_FREQUENCY;
         }
         
         lastTime = sceKernelGetSystemTimeWide();
@@ -132,7 +132,7 @@ int module_start(SceSize args, void *argp) {
   
   _displaySetFrameBuf = hook("sceDisplay_Service", "sceDisplay", 0x289D82FE, (void*)displaySetFrameBuf);
 
-  thid = sceKernelCreateThread("expover-thread", thread, 0x10, 0x10000, 0, NULL);
+  thid = sceKernelCreateThread("expover-thread", thread, 0x18, 0x8000, 0, NULL);
   if (thid >= 0) {
     sceKernelStartThread(thid, 0, NULL);
   }
