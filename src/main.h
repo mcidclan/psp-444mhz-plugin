@@ -9,7 +9,6 @@
 #define delayPipeline()                    \
   asm volatile(                            \
     ".set noreorder                    \n" \
-    "sync                              \n" \
     "nop; nop; nop; nop; nop; nop; nop \n" \
     ".set reorder                      \n" \
   )
@@ -46,28 +45,14 @@
 // Set clock domains to ratio 1:1
 #define resetDomains()               \
   hw(0xbc200000) = 511 << 16 | 511;  \
-  hw(0xBC200004) = 511 << 16 | 511;  \
-  hw(0xBC200008) = 511 << 16 | 511;  \
-  delayPipeline();
+  /*hw(0xBC200004) = 511 << 16 | 511;*/  \
+  /*hw(0xBC200008) = 511 << 16 | 511;*/  \
+  sync();
 
 // Wait for clock stability, signal propagation and pipeline drain
 #define settle()            \
+  sync();                   \
   u32 i = 0x1fffff;         \
   while (--i) {             \
     delayPipeline();        \
   }                         
-
-// Clear Exception Level bit in CP0 Status Register
-#define cleanEXL()                \
-  asm volatile(                   \
-    ".set noreorder          \n"  \
-    "mfc0 $8, $12            \n"  \
-    "ins  $8, $zero, 1, 1    \n"  \
-    "mtc0 $8, $12            \n"  \
-    "sync                    \n"  \
-    "nop                     \n"  \
-    "nop                     \n"  \
-    "nop                     \n"  \
-    ".set reorder            \n"  \
-    ::: "$8", "memory"            \
-  )
