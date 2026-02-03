@@ -6,6 +6,8 @@ This is an experimental project for technical/educational purposes only, intende
 ## Usage
 L_TRIGGER + R_TRIGGER + NOTE to switch between 333 and 444mhz.
 
+Visual feedback: displays a red square on white background when overclocking to 444 MHz, and a white square on green background when reverting to 333 MHz.
+
 ## Compatibility
 
 ### 2000 and 3000

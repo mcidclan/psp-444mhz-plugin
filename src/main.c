@@ -16,6 +16,9 @@ PSP_HEAP_SIZE_KB(512);
 int thid, alive = 0;
 int delay = 0, lastFreq = DEFAULT_FREQUENCY;
 
+static const u32 __attribute__((aligned(16))) COLORS_16[3] = {0xFFFF, 0x001F, 0x07E0};
+static const u32 __attribute__((aligned(16))) COLORS_32[3] = {0xFFFFFFFF, 0xFF0000FF, 0xFF00FF00};
+
 static inline int displaySetFrameBuf(void *fbuf, int width, int format, int sync) {
   
   void *frame = (void*)(0x40000000 | (u32)fbuf);
@@ -34,12 +37,13 @@ static inline int displaySetFrameBuf(void *fbuf, int width, int format, int sync
       ptr = (u32 *)((u8 *)frame + (y * width * bytesPerPixel));
       int x = 0;
       while (x < 32) {
-        u32 color;
         
-        int isInner = (x >= 8 && x < 24 && y >= 8 && y < 24);
-        int isWhite = (lastFreq == THEORETICAL_FREQUENCY) ? !isInner : isInner;
-        color = isWhite ? ((bytesPerPixel == 4) ? 0xFFFFFFFF : 0xFFFF) : 0;
-      
+        int drawInner = (x >= 8 && x < 24 && y >= 8 && y < 24);
+        int activated = (lastFreq == THEORETICAL_FREQUENCY);
+        
+        int colorIndex = (!activated && !drawInner) ? 2 : (activated && drawInner) ? 1 : 0;
+        u32 color = (bytesPerPixel == 4) ? COLORS_32[colorIndex] : COLORS_16[colorIndex];
+
         if (bytesPerPixel == 4) {
           *(u32 *)((u8 *)ptr + (x * 4)) = color;
         } else {
@@ -92,6 +96,8 @@ int thread(SceSize args, void *argp) {
       
       if(!init) {
         cancelOverclock();
+        //lastTime = sceKernelGetSystemTimeWide();
+        //delay = 10;
         init = 1;
       }
 
