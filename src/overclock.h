@@ -21,10 +21,7 @@
   const u32 lsb = (var/*_num*/) << 8 | PLL_DEN;     \
   const u32 multiplier = (PLL_MUL_MSB << 16) | lsb; \
   hw(0xbc1000fc) = multiplier;                      \
-  sync();                                           \
-  /*do {*/                                          \
-  /*  delayPipeline();*/                            \
-  /*} while(hw(0xbc1000fc) != multiplier);*/        \
+  delayPipeline();/*sync();*/                       \
 }
 
 // set bit bit 7 to apply index, wait until hardware clears it
@@ -37,14 +34,12 @@
 }
 
 static inline void setOverclock() {
-  
-  // note: needs to be 333 to be able to reach 444mhz
-  const int INITIAL_FREQUENCY = DEFAULT_FREQUENCY;  
-  
-  u32 _num = (u32)(((float)(INITIAL_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
+    
+  u32 _num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   const u32 num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
 
-  scePowerSetClockFrequency(INITIAL_FREQUENCY, INITIAL_FREQUENCY, INITIAL_FREQUENCY/2);
+  // note: needs to be 333 to be able to reach 444mhz
+  scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
   
   int intr;
   suspendCpuIntr(intr);
@@ -59,6 +54,8 @@ static inline void setOverclock() {
     _num++;
   }
   
+  hw(0xbc1000fc) |= (1 << 16);
+  
   settle();
   resetDomains();
   
@@ -67,23 +64,16 @@ static inline void setOverclock() {
 
 static inline void cancelOverclock() {
   
-  const int TARGET_FREQUENCY = DEFAULT_FREQUENCY;
-  const u32 num = (u32)(((float)(TARGET_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
+  u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
+  const u32 num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   
   int intr;
   suspendCpuIntr(intr);
 
-  const u32 pllIdx = hw(0xbc100068);
-  const u32 pllMul = hw(0xbc1000fc);
-  sync();
-  
-  const u32 msb = pllMul & 0xffff;
-  const u32 _den = msb & 0xff;
-  u32 _num = msb >> 8;
-  
-  const int overclocked = (int)(_den && ((_num / _den) > 9));
-  
-  if (overclocked && pllIdx == PLL_RATIO_INDEX) {
+  const u32 pllMul = hw(0xbc1000fc); sync();
+  const int overclocked = pllMul & (1 << 16);
+
+  if (overclocked) {
     
     resetDomains();
     

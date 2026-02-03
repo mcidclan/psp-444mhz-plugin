@@ -13,33 +13,40 @@
     ".set reorder                      \n" \
   )
 
-#define suspendCpuIntr(var) \
-  asm volatile(             \
-    ".set noreorder \n"     \
-    "mfic  %0, $0   \n"     \
-    "mtic  $0, $0   \n"     \
-    "sync           \n"     \
-    "nop            \n"     \
-    "nop            \n"     \
-    "nop            \n"     \
-    ".set reorder   \n"     \
-    : "=r"(var)             \
-    :                       \
-    : "$8", "memory"        \
+#define suspendCpuIntr(var)    \
+  asm volatile(                \
+    ".set push             \n" \
+    ".set noreorder        \n" \
+    ".set noat             \n" \
+    "mfc0  %0, $12         \n" \
+    "sync                  \n" \
+    "li    $k0, 0xFFFFFFFE \n" \
+    "and   $k0, %0, $k0    \n" \
+    "mtc0  $k0, $12        \n" \
+    "sync                  \n" \
+    "nop                   \n" \
+    "nop                   \n" \
+    "nop                   \n" \
+    ".set pop              \n" \
+    : "=r"(var)                \
+    :                          \
+    : "$k0", "memory"          \
   )
 
-#define resumeCpuIntr(var)  \
-  asm volatile(             \
-    ".set noreorder \n"     \
-    "mtic  %0, $0   \n"     \
-    "sync           \n"     \
-    "nop            \n"     \
-    "nop            \n"     \
-    "nop            \n"     \
-    ".set reorder   \n"     \
-    :                       \
-    : "r"(var)              \
-    : "memory"              \
+#define resumeCpuIntr(var) \
+  asm volatile(            \
+    ".set push      \n"    \
+    ".set noreorder \n"    \
+    ".set noat      \n"    \
+    "mtc0  %0, $12  \n"    \
+    "sync           \n"    \
+    "nop            \n"    \
+    "nop            \n"    \
+    "nop            \n"    \
+    ".set pop       \n"    \
+    :                      \
+    : "r"(var)             \
+    : "memory"             \
   )
 
 // Set clock domains to ratio 1:1
