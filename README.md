@@ -4,9 +4,18 @@
 This is an experimental project for technical/educational purposes only, intended for developers only. Stability is not guaranteed, use with caution.
 
 ## Usage
-L_TRIGGER + R_TRIGGER + NOTE to switch between 333 and 444mhz.
 
-Visual feedback: displays a red square on white background when overclocking to 444 MHz, and a white square on green background when reverting to 333 MHz.
+### Prerequisites
+Before using this plugin, make sure to:
+- Disable all previous versions or similar plugins
+- Remove any existing overclocking >333MHz code from your application
+
+### Controls
+Press **L_TRIGGER + R_TRIGGER + NOTE** to toggle between 333MHz and 444MHz.
+
+### Visual Feedback
+- **333MHz (standard)**: White square on green background
+- **444MHz (overclocked)**: Red square on white background
 
 ## Compatibility
 
