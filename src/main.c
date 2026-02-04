@@ -9,7 +9,7 @@
 #include "overclock.h"
 #include "hook.h"
 
-PSP_MODULE_INFO("expover-plugin", 0x1000, 1, 1);
+PSP_MODULE_INFO("expover-plugin", 0x1006, 1, 1);
 PSP_NO_CREATE_MAIN_THREAD();
 PSP_HEAP_SIZE_KB(512);
 
@@ -81,23 +81,24 @@ int switchOverclock() {
 
 int thread(SceSize args, void *argp) {
   
+  sceKernelDelayThread(2000000);
+  
   alive = 1;
   int init = 0;
   u64 lastTime = 0;
   u64 prev, now;
+  int width, format;
+  void *frame = NULL;
   
   while (alive) {
     
-    int width, format;
-    void *frame = NULL;
     sceDisplayGetFrameBuf(&frame, &width, &format, 0);
     
     if (frame) {
       
-      if(!init) {
-        cancelOverclock();
-        //lastTime = sceKernelGetSystemTimeWide();
-        //delay = 10;
+      if (!init) {
+        initOverclock();
+        delay = 10;
         init = 1;
       }
 
@@ -135,7 +136,7 @@ int thread(SceSize args, void *argp) {
 }
 
 int module_start(SceSize args, void *argp) {
-  
+    
   _displaySetFrameBuf = hook("sceDisplay_Service", "sceDisplay", 0x289D82FE, (void*)displaySetFrameBuf);
 
   thid = sceKernelCreateThread("expover-thread", thread, 0x18, 0x8000, 0, NULL);

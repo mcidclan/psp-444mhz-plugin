@@ -8,21 +8,20 @@
 
 #define delayPipeline()                    \
   asm volatile(                            \
-    ".set noreorder                    \n" \
     "nop; nop; nop; nop; nop; nop; nop \n" \
-    ".set reorder                      \n" \
   )
 
 #define suspendCpuIntr(var)    \
   asm volatile(                \
     ".set push             \n" \
     ".set noreorder        \n" \
+    ".set volatile         \n" \
     ".set noat             \n" \
     "mfc0  %0, $12         \n" \
     "sync                  \n" \
-    "li    $k0, 0xFFFFFFFE \n" \
-    "and   $k0, %0, $k0    \n" \
-    "mtc0  $k0, $12        \n" \
+    "li    $t0, 0x0FFFFFFE \n" \
+    "and   $t0, %0, $t0    \n" \
+    "mtc0  $t0, $12        \n" \
     "sync                  \n" \
     "nop                   \n" \
     "nop                   \n" \
@@ -30,13 +29,14 @@
     ".set pop              \n" \
     : "=r"(var)                \
     :                          \
-    : "$k0", "memory"          \
+    : "$t0", "memory"          \
   )
 
 #define resumeCpuIntr(var) \
   asm volatile(            \
     ".set push      \n"    \
     ".set noreorder \n"    \
+    ".set volatile  \n"    \
     ".set noat      \n"    \
     "mtc0  %0, $12  \n"    \
     "sync           \n"    \
@@ -50,16 +50,29 @@
   )
 
 // Set clock domains to ratio 1:1
-#define resetDomains()               \
+#define resetDomainRatios()          \
+  sync();                            \
   hw(0xbc200000) = 511 << 16 | 511;  \
-  /*hw(0xBC200004) = 511 << 16 | 511;*/  \
-  /*hw(0xBC200008) = 511 << 16 | 511;*/  \
+  hw(0xBC200004) = 511 << 16 | 511;  \
+  hw(0xBC200008) = 511 << 16 | 511;  \
   sync();
 
 // Wait for clock stability, signal propagation and pipeline drain
 #define settle()            \
+{                           \
   sync();                   \
   u32 i = 0x1fffff;         \
   while (--i) {             \
     delayPipeline();        \
-  }                         
+  }                         \
+}
+
+static inline void unlockMemory() {
+  const u32 start = 0xbc000000;
+  const u32 end   = 0xbc00002c;
+  for (u32 reg = start; reg <= end; reg += 4) {
+    hw(reg) = -1;
+  }
+  sync();
+}
+
