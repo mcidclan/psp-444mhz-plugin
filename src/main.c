@@ -97,6 +97,7 @@ int thread(SceSize args, void *argp) {
     if (frame) {
       
       if (!init) {
+        delay = 1;
         initOverclock();
         delay = 10;
         init = 1;
@@ -106,16 +107,16 @@ int thread(SceSize args, void *argp) {
       const int switching = switchOverclock();
       
       if (delay == 0 && switching) {
-        
         const int freq = lastFreq == THEORETICAL_FREQUENCY ? DEFAULT_FREQUENCY : THEORETICAL_FREQUENCY;
         if (freq == THEORETICAL_FREQUENCY) {
-          setOverclock();
+          delay = 1;
           lastFreq = THEORETICAL_FREQUENCY;
+          setOverclock();
         } else {
-          cancelOverclock();
+          delay = 1;
           lastFreq = DEFAULT_FREQUENCY;
+          cancelOverclock();
         }
-        
         lastTime = sceKernelGetSystemTimeWide();
         delay = 10;
       }
