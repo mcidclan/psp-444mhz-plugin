@@ -19,6 +19,11 @@ int delay = 0, lastFreq = DEFAULT_FREQUENCY;
 static const u32 __attribute__((aligned(16))) COLORS_16[3] = {0xFFFF, 0x001F, 0x07E0};
 static const u32 __attribute__((aligned(16))) COLORS_32[3] = {0xFFFFFFFF, 0xFF0000FF, 0xFF00FF00};
 
+static inline void exitGame() {
+  cancelOverclock();
+  _exitGame();
+}
+
 static inline int displaySetFrameBuf(void *fbuf, int width, int format, int sync) {
   
   void *frame = (void*)(0x40000000 | (u32)fbuf);
@@ -139,8 +144,9 @@ int thread(SceSize args, void *argp) {
 int module_start(SceSize args, void *argp) {
     
   _displaySetFrameBuf = hook("sceDisplay_Service", "sceDisplay", 0x289D82FE, (void*)displaySetFrameBuf);
+  _exitGame = hook("sceLoadExec", "LoadExecForUser", 0x05572A5F, (void*)exitGame);
 
-  thid = sceKernelCreateThread("expover-thread", thread, 0x18, 0x8000, 0, NULL);
+  thid = sceKernelCreateThread("expover-thread", thread, 0x18, 0x8000, PSP_THREAD_ATTR_VFPU, NULL);
   if (thid >= 0) {
     sceKernelStartThread(thid, 0, NULL);
   }

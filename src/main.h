@@ -6,6 +6,13 @@
     "sync       \n"     \
   )
 
+#define vfpuSync()      \
+  asm volatile(         \
+    "vsync       \n"    \
+    "vnop        \n"    \
+    "vnop        \n"    \
+  )
+
 #define delayPipeline()                    \
   asm volatile(                            \
     "nop; nop; nop; nop; nop; nop; nop \n" \
@@ -58,7 +65,8 @@
   sync();
 
 // Wait for clock stability, signal propagation and pipeline drain
-#define settle()            \
+/*
+ #define settle()            \
 {                           \
   sync();                   \
   u32 i = 0x1fffff;         \
@@ -66,6 +74,36 @@
     delayPipeline();        \
   }                         \
 }
+*/
+#define settle()                \
+  asm volatile(                 \
+    ".set push              \n" \
+    ".set noreorder         \n" \
+    ".set nomacro           \n" \
+    ".set volatile          \n" \
+    ".set noat              \n" \
+                                \
+    "sync                   \n" \
+    "lui  $t0, 0x1f         \n" \
+    "ori  $t0, $t0, 0xffff  \n" \
+                                \
+    "1:                     \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  nop                  \n" \
+    "  addiu $t0, $t0, -1   \n" \
+    "  bnez  $t0, 1b        \n" \
+    "  nop                  \n" \
+                                \
+    ".set pop               \n" \
+    :                           \
+    :                           \
+    : "$t0", "memory"           \
+  )
 
 static inline void unlockMemory() {
   const u32 start = 0xbc000000;
