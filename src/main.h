@@ -13,6 +13,13 @@
     "vnop        \n"    \
   )
 
+#define clearTags()       \
+  asm volatile (          \
+    "mtc0 $0, $28   \n"   \
+    "mtc0 $0, $29   \n"   \
+    "sync           \n"   \
+  )
+  
 #define delayPipeline()                    \
   asm volatile(                            \
     "nop; nop; nop; nop; nop; nop; nop \n" \
@@ -26,7 +33,7 @@
     ".set noat             \n" \
     "mfc0  %0, $12         \n" \
     "sync                  \n" \
-    "li    $t0, 0x0FFFFFFE \n" \
+    "li    $t0, 0xfffffffe \n" \
     "and   $t0, %0, $t0    \n" \
     "mtc0  $t0, $12        \n" \
     "sync                  \n" \
@@ -84,8 +91,8 @@
     ".set noat              \n" \
                                 \
     "sync                   \n" \
-    "lui  $t0, 0x1f         \n" \
-    "ori  $t0, $t0, 0xffff  \n" \
+    "lui  $t0, 0x05         \n" \
+    "ori  $t0, $t0, 0x5555  \n" \
                                 \
     "1:                     \n" \
     "  nop                  \n" \

@@ -86,7 +86,7 @@ int switchOverclock() {
 
 int thread(SceSize args, void *argp) {
   
-  sceKernelDelayThread(2000000);
+  sceKernelDelayThread(6000000);
   
   alive = 1;
   int init = 0;
