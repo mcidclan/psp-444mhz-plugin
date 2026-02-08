@@ -50,15 +50,11 @@ static inline void setOverclock() {
   
   while (theoreticalFreq <= THEORETICAL_FREQUENCY) {
     
-    //sceGeDrawSync(0);
-    vfpuSync();
-    sync();
-    
     int intr, state;
     state = sceKernelSuspendDispatchThread();
     suspendCpuIntr(intr);
     
-    clearTags();
+    // clearTags();
     
     u32 _num = (u32)(((float)(defaultFreq * PLL_DEN)) / PLL_BASE_FREQ);
     const u32 num = (u32)(((float)(theoreticalFreq * PLL_DEN)) / PLL_BASE_FREQ);
@@ -88,10 +84,6 @@ static inline int cancelOverclock() {
   u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   const u32 num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   
-  //sceGeDrawSync(0);
-  vfpuSync();
-  sync();
-
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);

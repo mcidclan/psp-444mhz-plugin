@@ -6,13 +6,6 @@
     "sync       \n"     \
   )
 
-#define vfpuSync()      \
-  asm volatile(         \
-    "vsync       \n"    \
-    "vnop        \n"    \
-    "vnop        \n"    \
-  )
-
 #define clearTags()       \
   asm volatile (          \
     "mtc0 $0, $28   \n"   \
