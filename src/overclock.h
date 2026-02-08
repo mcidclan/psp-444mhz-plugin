@@ -2,6 +2,7 @@
 #define H_OVERCLOCK_PLUGIN_MAIN
 
 #include "main.h"
+//#include <pspge.h>
 
 // Important:
 // - Phat not supported at 444Mhz
@@ -13,7 +14,6 @@
 
 #define    DEFAULT_FREQUENCY        333
 static int THEORETICAL_FREQUENCY  = 444;
-//#define THEORETICAL_FREQUENCY     444 /*try with 407 if not working*/
 
 #define PLL_MUL_MSB               0x0124
 #define PLL_RATIO_INDEX           5
@@ -43,16 +43,16 @@ static int THEORETICAL_FREQUENCY  = 444;
 static inline void setOverclock() {
   
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
-  // resetDomainRatios();
   
   int defaultFreq = DEFAULT_FREQUENCY;
   int theoreticalFreq = defaultFreq + PLL_BASE_FREQ;
   const int freqStep = PLL_BASE_FREQ / 2;
   
-  vfpuSync();
-  sync();
-  
   while (theoreticalFreq <= THEORETICAL_FREQUENCY) {
+    
+    //sceGeDrawSync(0);
+    vfpuSync();
+    sync();
     
     int intr, state;
     state = sceKernelSuspendDispatchThread();
@@ -71,9 +71,6 @@ static inline void setOverclock() {
       _num++;
     }
     settle();
-
-    //hw(0xbc1000fc) |= (1 << PLL_CUSTOM_FLAG);
-    //sync();
     
     defaultFreq += freqStep;
     theoreticalFreq = defaultFreq + freqStep;
@@ -91,6 +88,7 @@ static inline int cancelOverclock() {
   u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   const u32 num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / PLL_BASE_FREQ);
   
+  //sceGeDrawSync(0);
   vfpuSync();
   sync();
 
@@ -110,9 +108,6 @@ static inline int cancelOverclock() {
       _num--;
     }
     settle();
-
-    //hw(0xbc1000fc) &= ~((1 << PLL_CUSTOM_FLAG));
-    //sync();
   }
   
   resumeCpuIntr(intr);
