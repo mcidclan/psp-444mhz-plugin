@@ -123,7 +123,6 @@ static inline int readFreqConfig() {
     sceIoRead(f, buf, sizeof(buf) - 1);
     sceIoClose(f);
   } else {
-    while(1);
     return -1;
   }
   u32 result = 0;
