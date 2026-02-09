@@ -38,4 +38,7 @@ Not tested
 ## Disclamer
 This project and code are provided as-is without warranty. Users assume full responsibility for any implementation or consequences. Use at your own discretion and risk
 
+## Special Mention
+Thanks to z2442 and st1x51 for testing, and to koutsie whose claims about overclocking possibilities motivated me to investigate and experiment on the subject.
+
 *m-c/d*
