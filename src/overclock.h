@@ -45,8 +45,8 @@ static inline void setOverclock() {
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
   
   int defaultFreq = DEFAULT_FREQUENCY;
-  int theoreticalFreq = defaultFreq + PLL_BASE_FREQ;
   const int freqStep = PLL_BASE_FREQ / 2;
+  int theoreticalFreq = defaultFreq + freqStep;
   
   while (theoreticalFreq <= THEORETICAL_FREQUENCY) {
     
