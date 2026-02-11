@@ -4,7 +4,7 @@ This stress tester determines the maximum value, with a small margin, of the fre
 
 ## Usage
 
-Copy the EBOOT and kcall.prx to the same folder in your `GAME` folder, then just run the program as any other homebrew. Press `Triangle` to start the process, and let the frequency increase until the device freezes and shuts down.  
+Copy the EBOOT and kcall.prx to the same folder in your `GAME` folder, then just run the program as any other homebrew. Press `Triangle` to start the process, wait for the status `RUNNING`, and let the frequency increase until the device freezes and shuts down. You can cancel the process by pressing `Triangle` at any time, then wait for the status `STOPPED`.
 
 Note: Keep in mind that it still needs improvement to get a more precise value.
 

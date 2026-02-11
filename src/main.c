@@ -74,8 +74,10 @@ int switchOverclock() {
   int ret = 0;
   sceCtrlPeekBufferPositive(&ctl, 1);
   if (
-    !switched &&
-    (ctl.Buttons & PSP_CTRL_NOTE) &&
+    !switched && (
+      (ctl.Buttons & PSP_CTRL_NOTE) ||
+      (ctl.Buttons & PSP_CTRL_CIRCLE)
+    ) &&
     (ctl.Buttons & PSP_CTRL_LTRIGGER) &&
     (ctl.Buttons & PSP_CTRL_RTRIGGER)
   ) {

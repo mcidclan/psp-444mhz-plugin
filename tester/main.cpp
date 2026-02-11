@@ -20,6 +20,9 @@ PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU | PSP_THREAD_ATTR_USER);
 #define cancelOverclock()                                                      \
   kcall((int (*)(void))(0x80000000 | (unsigned int)_cancelOverclock));
 
+#define dump()                                                                 \
+  kcall((int (*)(void))(0x80000000 | (unsigned int)_dump));
+
 #define DELAY_AFTER_CLOCK_CHANGE 300000
 
 // Note:
@@ -29,16 +32,17 @@ PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU | PSP_THREAD_ATTR_USER);
 // PLL_FREQ = PLL_BASE_FREQ * (PLL_NUM / PLL_DEN) * PLL_RATIO, with PLL_BASE_FREQ = 37 and PLL_RATIO = 1.0f
 
 #define    DEFAULT_FREQUENCY         333
-static int THEORETICAL_FREQUENCY   = 518;
+static int THEORETICAL_FREQUENCY   = 466;
 
 #define PLL_MUL_MSB           0x0124
 #define PLL_BASE_FREQ         37
-#define PLL_DEN               18
+#define PLL_DEN               20
 #define PLL_RATIO_INDEX       5
 #define PLL_RATIO             1.0f
 #define PLL_CUSTOM_FLAG       (27 - 16)
 
-int currFreq = 0;
+int switchOverclock = 0, stopped = 0;
+int currFreq = 0, targetFreq = DEFAULT_FREQUENCY;
 
 static int writeFrequency(u32 freq) {
   static char buf[16];
@@ -64,9 +68,18 @@ static int writeFrequency(u32 freq) {
   return 0;
 }
 
+u32 ctrl = 0, mult = 0;
+int _dump() {
+  ctrl = hw(0xbc100068);
+  mult = hw(0xbc1000fc);
+  sync();
+  return 0;
+}
+
 int _setOverclock() {
   
   currFreq = 333;
+  stopped = 0;
 
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
 
@@ -74,7 +87,8 @@ int _setOverclock() {
   int defaultFreq = DEFAULT_FREQUENCY;
   int theoreticalFreq = defaultFreq + freqStep;
 
-  while (theoreticalFreq <= THEORETICAL_FREQUENCY) {
+  while ((theoreticalFreq <= THEORETICAL_FREQUENCY) &&
+    (targetFreq == THEORETICAL_FREQUENCY)) {
   
     int intr, state;
     state = sceKernelSuspendDispatchThread();
@@ -112,6 +126,7 @@ int _setOverclock() {
     writeFrequency(currFreq);
     sceKernelDelayThread(2000000);
     currFreq = defaultFreq;
+    _dump();
   }
   return 0;
 }
@@ -149,11 +164,13 @@ void _cancelOverclock() {
   
   resumeCpuIntr(intr);
   sceKernelResumeDispatchThread(state);
+  stopped = 1;
 }
 
 static inline void initOverclock() {
   sceKernelIcacheInvalidateAll();
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
+  dump();
   cancelOverclock();
   sceKernelDelayThread(DELAY_AFTER_CLOCK_CHANGE);
 }
@@ -186,25 +203,24 @@ void guInit() {
   sceGuSync(0,0);
 }
 
-unsigned int lastFreq = DEFAULT_FREQUENCY;
 int thread() {
   
   SceCtrlData ctl;
   initOverclock();
   while (1) {
     sceCtrlPeekBufferPositive(&ctl, 1);
-
-    if (ctl.Buttons & PSP_CTRL_TRIANGLE) {
+    
+    if (switchOverclock == 1) {
       
-      const int freq = lastFreq == DEFAULT_FREQUENCY ?
-        THEORETICAL_FREQUENCY : DEFAULT_FREQUENCY;
-      
-      if (freq == THEORETICAL_FREQUENCY) {
-        lastFreq = THEORETICAL_FREQUENCY;
+      switchOverclock = 2;
+      if (targetFreq == THEORETICAL_FREQUENCY) {
         setOverclock();
       }
-      sceKernelDelayThread(DELAY_AFTER_CLOCK_CHANGE);
+      else {
+        cancelOverclock();
+      }
     }
+    
     sceKernelDelayThread(100);
   }
 }
@@ -247,19 +263,35 @@ int main() {
     const u32 offset = (buffer == DRAW_BUF_0) ? DRAW_BUF_0 : DRAW_BUF_1;    
     sceCtrlPeekBufferPositive(&ctl, 1);
     
+    if (!switchOverclock && (ctl.Buttons & PSP_CTRL_TRIANGLE)) {
+      
+      const int freq = targetFreq == DEFAULT_FREQUENCY ?
+      THEORETICAL_FREQUENCY : DEFAULT_FREQUENCY;
+      
+      if (freq == THEORETICAL_FREQUENCY) {
+        targetFreq = THEORETICAL_FREQUENCY;
+      } else {
+        targetFreq = DEFAULT_FREQUENCY;
+      }
+      switchOverclock = 1;
+      sceKernelDelayThread(DELAY_AFTER_CLOCK_CHANGE);
+    }
+    else if(!(ctl.Buttons & PSP_CTRL_TRIANGLE) && switchOverclock == 2) {
+      switchOverclock = 0;
+    }
+    
     sceGuStart(GU_DIRECT, list);
     sceGuClear(GU_COLOR_BUFFER_BIT | GU_DEPTH_BUFFER_BIT);
 
     pspDebugScreenSetOffset(offset);
     
-    pspDebugScreenSetXY(1, 0);
-    pspDebugScreenPrintf("FPS: %llu    ", fps);
-    pspDebugScreenSetXY(1, 1);
-    pspDebugScreenPrintf("Target freq: %u MHz", lastFreq);
-    pspDebugScreenSetXY(1, 2);
-    pspDebugScreenPrintf("Current freq: %u MHz", currFreq);
-    pspDebugScreenSetXY(1, 3);
-    pspDebugScreenPrintf("last saved freq: %u MHz", currFreq - 5);
+    pspDebugScreenSetXY(0, 0);
+    pspDebugScreenPrintf(" FPS: %llu               \n", fps);
+    pspDebugScreenPrintf(" Target freq: %u MHz     \n", targetFreq);
+    pspDebugScreenPrintf(" Current freq: %u MHz    \n", currFreq);
+    pspDebugScreenPrintf(" Test is %s            \n\n", stopped ? "STOPPED" : "RUNNING...");
+    pspDebugScreenPrintf(" Ctrl: 0x%08x            \n", ctrl);
+    pspDebugScreenPrintf(" Mult: 0x%08x            \n", mult);
     
     {
       Vertex* const vertices = (Vertex*)sceGuGetMemory(sizeof(Vertex) * 2);

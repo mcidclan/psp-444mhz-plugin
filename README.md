@@ -11,7 +11,7 @@ Before using this plugin, make sure to:
 - Remove any existing overclocking >333MHz code from your application
 
 ### Controls
-Press **L_TRIGGER + R_TRIGGER + NOTE** to toggle between 333MHz and 444MHz, or the frequency set in the ms0:/overconfig.txt file.
+Press **L_TRIGGER + R_TRIGGER + NOTE** (or alternatively **L_TRIGGER + R_TRIGGER + CIRCLE**) to toggle between 333MHz and 444MHz, or the frequency set in the ms0:/overconfig.txt file.
 
 ### Visual Feedback
 - **333MHz (standard)**: White square on green background
