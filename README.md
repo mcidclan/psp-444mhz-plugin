@@ -19,12 +19,17 @@ Press **L_TRIGGER + R_TRIGGER + NOTE** to toggle between 333MHz and 444MHz, or t
 The plugin auto-starts at 333MHz. In most cases, you should see the square a few seconds after the game/homebrew boots.
 
 ### ms0:/overconfig.txt
-If the file doesn't exist, the plugin will target 444MHz for the overclock frequency. The value in the file must be between 333 and 444, which could be stable on some 2k and 3k models, but not all of them.
+If the file doesn't exist, the plugin will target 444MHz for the overclock frequency. The value in the file must be between 333 and 444, which could be stable on some 2k and 3k models, but not all of them.  
+
+You can create that file manually, or use the overclock stress tester provided with this project, and let it create the file at the root of the memory stick for you with the maximum frequency supported by your PSP. Keep in mind that it still needs improvement to get a more precise value.
 
 ## Compatibility and Testing
 
 ### Testing Methodology
 After experiencing instability during testing, it is preferable to remove the battery and any other power source in order to start fresh with a clean test. Additionally, when restarting, you may perform a reset using SELECT + START + △ (Triangle) + □ (Square).
+
+### Overclock Stress Tester
+See the `tester` folder of this repository for more information.
 
 ### PSP 2000 and 3000
 Tested on PSP 2000 and 3000. Reaching 444MHz, which appears to be the limit before instabilities occur. Other tests on different 2000 and 3000 units show a limit between 407 and 416MHz. In any case, you will have to figure out your ideal frequency by starting at 444MHz and testing homebrew and games. If you encounter instabilities, decrease the frequency in steps of 12MHz (for example).
