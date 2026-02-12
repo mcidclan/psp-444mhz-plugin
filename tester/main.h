@@ -58,8 +58,8 @@
     ".set noat              \n" \
                                 \
     "sync                   \n" \
-    "lui  $t0, 0x05         \n" \
-    "ori  $t0, $t0, 0x5555  \n" \
+    "lui  $t0, 0x1f         \n" \
+    "ori  $t0, $t0, 0xffff  \n" \
                                 \
     "1:                     \n" \
     "  nop                  \n" \

@@ -39,7 +39,7 @@ static int THEORETICAL_FREQUENCY   = 466;
 #define PLL_DEN               20
 #define PLL_RATIO_INDEX       5
 #define PLL_RATIO             1.0f
-#define PLL_CUSTOM_FLAG       (27 - 16)
+//#define PLL_CUSTOM_FLAG       (27 - 16)
 
 int switchOverclock = 0, stopped = 0;
 int currFreq = 0, targetFreq = DEFAULT_FREQUENCY;
@@ -78,6 +78,7 @@ int _dump() {
 
 int _setOverclock() {
   
+  sceKernelDelayThread(3000000);
   currFreq = 333;
   stopped = 0;
 
@@ -104,11 +105,11 @@ int _setOverclock() {
       } while (hw(0xbc100068) != PLL_RATIO_INDEX);
     }
     
-    const u32 msb = PLL_MUL_MSB | (1 << PLL_CUSTOM_FLAG);
+    //const u32 msb = PLL_MUL_MSB | (1 << PLL_CUSTOM_FLAG);
     
     while (_num <= num) {
       const u32 lsb = _num << 8 | PLL_DEN;
-      const u32 multiplier = (msb << 16) | lsb;
+      const u32 multiplier = (PLL_MUL_MSB << 16) | lsb;
       hw(0xbc1000fc) = multiplier;
       sync();
       _num++;
@@ -122,9 +123,9 @@ int _setOverclock() {
     sceKernelResumeDispatchThread(state);
   
     scePowerTick(PSP_POWER_TICK_ALL);
-    sceKernelDelayThread(6000000);
+    sceKernelDelayThread(9000000);
     writeFrequency(currFreq);
-    sceKernelDelayThread(2000000);
+    sceKernelDelayThread(3000000);
     currFreq = defaultFreq;
     _dump();
   }
@@ -139,9 +140,18 @@ void _cancelOverclock() {
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
-    
-  const u32 pllMul = hw(0xbc1000fc); sync();
-  const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
+  
+  const u32 pllCtl = hw(0xbc100068);
+  const u32 pllMul = hw(0xbc1000fc);
+  sync();
+  
+  const float n = (float)((pllMul & 0xff00) >> 8);
+  const float d = (float)((pllMul & 0x00ff));
+  const float m = n / d;
+  const int overclocked = ((pllCtl & 5) && (m > 9)) ? 1 : 0;
+
+  // const u32 pllMul = hw(0xbc1000fc); sync();
+  // const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
   
   if (overclocked) {
 
@@ -197,7 +207,9 @@ void guInit() {
   sceGuDispBuffer(SCR_WIDTH, SCR_HEIGHT, (void*)DRAW_BUF_1, BUF_WIDTH);
   sceGuDepthBuffer((void*)DEPTH_BUF, BUF_WIDTH);
   sceGuDisable(GU_DEPTH_TEST);
-  sceGuDisable(GU_SCISSOR_TEST);
+  sceGuEnable(GU_SCISSOR_TEST);
+  sceGuScissor(0, 64, 480, 272 - 128);
+  sceGuClearColor(0xff100808);
   sceGuDisplay(GU_TRUE);
   sceGuFinish();
   sceGuSync(0,0);
@@ -245,7 +257,7 @@ int main() {
   }
   
   pspDebugScreenInitEx(0x0, PSP_DISPLAY_PIXEL_FORMAT_8888, 0);
-  pspDebugScreenEnableBackColor(0);
+  pspDebugScreenEnableBackColor(1);
 
   int buffer = DRAW_BUF_0;
   pspDebugScreenSetOffset(buffer);
@@ -284,6 +296,9 @@ int main() {
     sceGuClear(GU_COLOR_BUFFER_BIT | GU_DEPTH_BUFFER_BIT);
 
     pspDebugScreenSetOffset(offset);
+    
+    pspDebugScreenSetXY(40, 0);
+    pspDebugScreenPrintf("Overclock Stress Tester v2.4");
     
     pspDebugScreenSetXY(0, 0);
     pspDebugScreenPrintf(" FPS: %llu               \n", fps);
