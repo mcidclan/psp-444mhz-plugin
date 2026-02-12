@@ -19,7 +19,7 @@ static int THEORETICAL_FREQUENCY  = 444;
 #define PLL_RATIO_INDEX           5
 #define PLL_BASE_FREQ             37
 #define PLL_DEN                   20
-//#define PLL_CUSTOM_FLAG           (27 - 16)
+#define PLL_CUSTOM_FLAG           (27 - 16)
 
 #define updatePLLMultiplier(num, msb)               \
 {                                                   \
@@ -61,9 +61,9 @@ static inline void setOverclock() {
     
     updatePLLControl();
     
-    // const u32 msb = PLL_MUL_MSB | (1 << PLL_CUSTOM_FLAG);
+    const u32 msb = PLL_MUL_MSB | (1 << PLL_CUSTOM_FLAG);
     while (_num <= num) {
-      updatePLLMultiplier(_num, PLL_MUL_MSB);
+      updatePLLMultiplier(_num, msb);
       _num++;
     }
     settle();
@@ -88,6 +88,7 @@ static inline int cancelOverclock() {
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
   
+  /*
   const u32 pllCtl = hw(0xbc100068);
   const u32 pllMul = hw(0xbc1000fc);
   sync();
@@ -96,9 +97,10 @@ static inline int cancelOverclock() {
   const float d = (float)((pllMul & 0x00ff));
   const float m = (d > 0.0f) ? (n / d) : 9.0f;
   const int overclocked = ((pllCtl & 5) && (m > 9.0f)) ? 1 : 0;
-
-  // const u32 pllMul = hw(0xbc1000fc); sync();
-  // const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
+  */
+  
+  const u32 pllMul = hw(0xbc1000fc); sync();
+  const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
   
   if (overclocked) {
     
