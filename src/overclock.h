@@ -94,8 +94,8 @@ static inline int cancelOverclock() {
   
   const float n = (float)((pllMul & 0xff00) >> 8);
   const float d = (float)((pllMul & 0x00ff));
-  const float m = n / d;
-  const int overclocked = ((pllCtl & 5) && (m > 9)) ? 1 : 0;
+  const float m = (d > 0.0f) ? (n / d) : 9.0f;
+  const int overclocked = ((pllCtl & 5) && (m > 9.0f)) ? 1 : 0;
 
   // const u32 pllMul = hw(0xbc1000fc); sync();
   // const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
