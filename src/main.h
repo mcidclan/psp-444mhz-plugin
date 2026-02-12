@@ -1,3 +1,5 @@
+#define u32 unsigned int
+
 #define hw(addr)                      \
   (*((volatile unsigned int*)(addr)))
 

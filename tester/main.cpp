@@ -14,15 +14,6 @@ PSP_MODULE_INFO("expover-tester", 0, 1, 1);
 PSP_HEAP_SIZE_KB(-1024);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU | PSP_THREAD_ATTR_USER);
 
-#define setOverclock()                                                         \
-  kcall((int (*)(void))(0x80000000 | (unsigned int)_setOverclock));
-
-#define cancelOverclock()                                                      \
-  kcall((int (*)(void))(0x80000000 | (unsigned int)_cancelOverclock));
-
-#define dump()                                                                 \
-  kcall((int (*)(void))(0x80000000 | (unsigned int)_dump));
-
 #define DELAY_AFTER_CLOCK_CHANGE 300000
 
 // Note:
@@ -39,7 +30,7 @@ static int THEORETICAL_FREQUENCY   = 466;
 #define PLL_DEN               20
 #define PLL_RATIO_INDEX       5
 #define PLL_RATIO             1.0f
-#define PLL_CUSTOM_FLAG       (27 - 16)
+//#define PLL_CUSTOM_FLAG       27
 
 int switchOverclock = 0, stopped = 0;
 int currFreq = 0, targetFreq = DEFAULT_FREQUENCY;
@@ -60,7 +51,7 @@ static int writeFrequency(u32 freq) {
   }
   
   SceUID fd = sceIoOpen("ms0:/overconfig.txt", PSP_O_RDWR | PSP_O_CREAT | PSP_O_TRUNC, 0777);
-  if (fd >= 0) {  
+  if (fd >= 0) {
     buf[i++] = '\n';
     sceIoWrite(fd, buf, i);
     sceIoClose(fd);
@@ -70,50 +61,98 @@ static int writeFrequency(u32 freq) {
 
 u32 ctrl = 0, mult = 0;
 int _dump() {
+  int intr, state;
+  state = sceKernelSuspendDispatchThread();
+  suspendCpuIntr(intr);
   ctrl = hw(0xbc100068);
   mult = hw(0xbc1000fc);
   sync();
+  resumeCpuIntr(intr);
+  sceKernelResumeDispatchThread(state);
   return 0;
 }
 
+#define updatePLLControl()                          \
+{                                                   \
+  if (!(hw(0xbc100068) & PLL_RATIO_INDEX)) {        \
+    hw(0xbc100068) = 0x80 | PLL_RATIO_INDEX;        \
+    /*hw(0xbc100068) &= 0xfffffff0;*/               \
+    /*hw(0xbc100068) |= (0x80 | PLL_RATIO_INDEX);*/ \
+    sync();                                         \
+    do {                                            \
+      delayPipeline();                              \
+    } while (hw(0xbc100068) & 0x80);                \
+  }                                                 \
+}
+
+#define updatePLLMultiplier(num, msb)               \
+{                                                   \
+  const u32 lsb = (num) << 8 | PLL_DEN;             \
+  const u32 multiplier = (msb << 16) | lsb;         \
+  hw(0xbc1000fc) = multiplier;                      \
+  sync();                                           \
+}
+
+void rampUpPLLRatio() {
+  
+  int intr, state;
+  state = sceKernelSuspendDispatchThread();
+  suspendCpuIntr(intr);
+  settle();
+  
+  const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
+  hw(0xbc1000fc) = PLL_MUL_MSB << 16 | defaultNum << 8 | PLL_DEN;
+  sync();
+  
+  u32 index = hw(0xbc100068) & 0x0f;
+  while (index <= 5) {
+    hw(0xbc100068) = 0x80 | index;
+    sync();  
+    do {
+      delayPipeline();
+    } while ((hw(0xbc100068) & 0x80));
+    settle();
+    index++;
+  }
+  
+  resumeCpuIntr(intr);
+  sceKernelResumeDispatchThread(state);
+}
+  
 int _setOverclock() {
   
   sceKernelDelayThread(3000000);
-  currFreq = 333;
   stopped = 0;
 
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
+  currFreq = DEFAULT_FREQUENCY;
 
+  rampUpPLLRatio();
+  
   const int freqStep = 5;
   int defaultFreq = DEFAULT_FREQUENCY;
   int theoreticalFreq = defaultFreq + freqStep;
 
   while ((theoreticalFreq <= THEORETICAL_FREQUENCY) &&
     (targetFreq == THEORETICAL_FREQUENCY)) {
-  
+    
+    _dump();
+    
     int intr, state;
     state = sceKernelSuspendDispatchThread();
     suspendCpuIntr(intr);
 
-    u32 _num = (u32)(((float)(defaultFreq * PLL_DEN)) / (PLL_BASE_FREQ * PLL_RATIO));
-    const u32 num = (u32)(((float)(theoreticalFreq * PLL_DEN)) / (PLL_BASE_FREQ * PLL_RATIO));
+    u32 _num = (u32)(((float)(defaultFreq * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
+    const u32 num = (u32)(((float)(theoreticalFreq * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
     
-    if ((hw(0xbc100068) & 0xff) != PLL_RATIO_INDEX) {
-      hw(0xbc100068) = 0x80 | PLL_RATIO_INDEX; sync();
-      do {
-        delayPipeline();
-      } while (hw(0xbc100068) != PLL_RATIO_INDEX);
-    }
-    
-    const u32 msb = PLL_MUL_MSB | (1 << PLL_CUSTOM_FLAG);
-    
+    updatePLLControl();
+        
+    //const u32 msb = PLL_MUL_MSB | (1 << (PLL_CUSTOM_FLAG - 16));
     while (_num <= num) {
-      const u32 lsb = _num << 8 | PLL_DEN;
-      const u32 multiplier = (msb << 16) | lsb;
-      hw(0xbc1000fc) = multiplier;
-      sync();
+      updatePLLMultiplier(_num, PLL_MUL_MSB);
       _num++;
     }
+    
     settle();
     
     defaultFreq += freqStep;
@@ -121,27 +160,25 @@ int _setOverclock() {
     
     resumeCpuIntr(intr);
     sceKernelResumeDispatchThread(state);
-  
+
     scePowerTick(PSP_POWER_TICK_ALL);
     sceKernelDelayThread(9000000);
     writeFrequency(currFreq);
-    sceKernelDelayThread(3000000);
+    sceKernelDelayThread(2000000);
     currFreq = defaultFreq;
-    _dump();
   }
   return 0;
 }
 
 void _cancelOverclock() {
   
-  u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / (PLL_BASE_FREQ * PLL_RATIO));
-  const unsigned int num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / (PLL_BASE_FREQ * PLL_RATIO));
+  u32 _num = (u32)(((float)(THEORETICAL_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
+  const unsigned int num = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
 
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
   
-  /*
   const u32 pllCtl = hw(0xbc100068);
   const u32 pllMul = hw(0xbc1000fc);
   sync();
@@ -150,25 +187,16 @@ void _cancelOverclock() {
   const float d = (float)((pllMul & 0x00ff));
   const float m = (d > 0.0f) ? (n / d) : 9.0f;
   const int overclocked = ((pllCtl & 5) && (m > 9.0f)) ? 1 : 0;
-  */
   
-  const u32 pllMul = hw(0xbc1000fc); sync();
-  const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
+  //const u32 pllMul = hw(0xbc1000fc); sync();
+  //const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
   
   if (overclocked) {
 
-    if ((hw(0xbc100068) & 0xff) != PLL_RATIO_INDEX) {
-      hw(0xbc100068) = 0x80 | PLL_RATIO_INDEX; sync();
-      do {
-        delayPipeline();
-      } while (hw(0xbc100068) != PLL_RATIO_INDEX);
-    }
+    updatePLLControl();
 
     while (_num >= num) {
-      const u32 lsb = _num << 8 | PLL_DEN;
-      const u32 multiplier = (PLL_MUL_MSB << 16) | lsb;
-      hw(0xbc1000fc) = multiplier;
-      sync();
+      updatePLLMultiplier(_num, PLL_MUL_MSB);
       _num--;
     }
     settle();
@@ -177,12 +205,16 @@ void _cancelOverclock() {
   resumeCpuIntr(intr);
   sceKernelResumeDispatchThread(state);
   stopped = 1;
+  _dump();
 }
 
 static inline void initOverclock() {
   sceKernelIcacheInvalidateAll();
+  // unlockMemory();
+  
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
   dump();
+  
   cancelOverclock();
   sceKernelDelayThread(DELAY_AFTER_CLOCK_CHANGE);
 }
@@ -222,6 +254,7 @@ int thread() {
   SceCtrlData ctl;
   initOverclock();
   while (1) {
+    
     sceCtrlPeekBufferPositive(&ctl, 1);
     
     if (switchOverclock == 1) {
@@ -240,6 +273,7 @@ int thread() {
 }
 
 int main() {
+  
   pspDebugScreenInit();
   pspDebugScreenSetXY(1, 1);
   
@@ -305,7 +339,7 @@ int main() {
     pspDebugScreenSetXY(0, 0);
     pspDebugScreenPrintf(" FPS: %llu               \n", fps);
     pspDebugScreenPrintf(" Target freq: %u MHz     \n", targetFreq);
-    pspDebugScreenPrintf(" Current freq: %u MHz    \n", currFreq);
+    pspDebugScreenPrintf(" Saved freq:  %u MHz     \n", currFreq);
     pspDebugScreenPrintf(" Test is %s            \n\n", stopped ? "STOPPED" : "RUNNING...");
     pspDebugScreenPrintf(" Ctrl: 0x%08x            \n", ctrl);
     pspDebugScreenPrintf(" Mult: 0x%08x            \n", mult);

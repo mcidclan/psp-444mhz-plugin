@@ -108,8 +108,7 @@ int thread(SceSize args, void *argp) {
     if (frame) {
       
       if (!init) {
-        delay = 1;
-        initOverclock();
+        initOverclock(&delay);
         delay = 10;
         init = 1;
       }
