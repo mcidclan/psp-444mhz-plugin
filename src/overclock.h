@@ -42,12 +42,13 @@ static int THEORETICAL_FREQUENCY  = 444;
   }                                                 \
 }
 
-void rampUpPLLRatio() {
+static inline void rampUpPLLRatio() {
+  sceKernelDelayThread(100);
   
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
-  settle();
+  // settle();
   
   const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)PLL_BASE_FREQ));
   hw(0xbc1000fc) = PLL_MUL_MSB << 16 | defaultNum << 8 | PLL_DEN;
@@ -66,6 +67,7 @@ void rampUpPLLRatio() {
   
   resumeCpuIntr(intr);
   sceKernelResumeDispatchThread(state);
+  sceKernelDelayThread(100);
 }
 
 
@@ -104,7 +106,7 @@ static inline void setOverclock() {
     resumeCpuIntr(intr);
     sceKernelResumeDispatchThread(state);
   
-    scePowerTick(PSP_POWER_TICK_ALL);
+    // scePowerTick(PSP_POWER_TICK_ALL);
     sceKernelDelayThread(100);
   }
 }
