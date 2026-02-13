@@ -43,6 +43,13 @@ Not tested.
 ### PSP Street (E1000)
 Not tested.
 
+## Build
+You can build the project using `./build.sh`. This will bundle all files into `./bin/build/` ready to be copied to the root of your Memory Stick.
+
+To track which version you've built, use `./build.sh <version>` (e.g., `./build.sh v2.4`). This generates a `note.txt` file from the template with the specified version number.
+
+The README.md files are automatically included in their respective directories so you have the instructions available locally.
+
 ## Disclamer
 This project and code are provided as-is without warranty. Users assume full responsibility for any implementation or consequences. Use at your own discretion and risk
 
