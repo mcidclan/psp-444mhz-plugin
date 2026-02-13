@@ -48,21 +48,23 @@ static inline void rampUpPLLRatio() {
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
-  // settle();
-  
-  const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)PLL_BASE_FREQ));
-  hw(0xbc1000fc) = PLL_MUL_MSB << 16 | defaultNum << 8 | PLL_DEN;
-  sync();
   
   u32 index = hw(0xbc100068) & 0x0f;
-  while (index <= 5) {
-    hw(0xbc100068) = 0x80 | index;
-    sync();  
-    do {
-      delayPipeline();
-    } while ((hw(0xbc100068) & 0x80));
-    settle();
-    index++;
+  if (index < 5) {
+    
+    const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)PLL_BASE_FREQ));
+    hw(0xbc1000fc) = (PLL_MUL_MSB << 16) | (defaultNum << 8) | PLL_DEN;
+    sync();
+    
+    while (index <= 5) {
+      hw(0xbc100068) = 0x80 | index;
+      sync();  
+      do {
+        delayPipeline();
+      } while ((hw(0xbc100068) & 0x80));
+      settle();
+      index++;
+    }
   }
   
   resumeCpuIntr(intr);
