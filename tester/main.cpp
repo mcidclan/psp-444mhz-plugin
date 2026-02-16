@@ -82,6 +82,7 @@ int _dump() {
     do {                                            \
       delayPipeline();                              \
     } while (hw(0xbc100068) & 0x80);                \
+    sync();                                         \
   }                                                 \
 }
 
@@ -93,35 +94,94 @@ int _dump() {
   sync();                                           \
 }
 
-void rampUpPLLRatio() {
+inline void adjustPLLMultiplier() {
+  
+  const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
+  hw(0xbc1000fc) = (PLL_MUL_MSB << 16) | (defaultNum << 8) | PLL_DEN;
+  settle();
+}
+
+inline void adjustPLLRatio() {
+  
+  u32 index = hw(0xbc100068) & 0x0f;
+  sync();
+
+  if (index != 5) {
+    
+    //const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
+    //hw(0xbc1000fc) = (PLL_MUL_MSB << 16) | (defaultNum << 8) | PLL_DEN;
+    //sync();
+    
+    const int step = (index > 5) ? -1 : 1;
+    while (((step < 0) == (index > 5)) || index == 5) {
+    //while ((step < 0 && index >= 5) || (step > 0 && index <= 5)) {
+        
+      hw(0xbc100068) = 0x80 | index;
+      sync();
+      
+      do {
+        delayPipeline();
+      } while ((hw(0xbc100068) & 0x80));
+      settle();
+      
+      index += step;
+    }
+  }
+  
+}
+
+inline void adjustDomainRatios() {
+  
+  const u32 cpu = hw(0xbc200000);
+  const u32 bus = hw(0xBC200004);
+  sync();
+  
+  u32 cpuDen = cpu & 0x1ff;
+  u32 cpuNum = (cpu >> 16) & 0x1ff;
+  u32 busDen = bus & 0x1ff;
+  u32 busNum = (bus >> 16) & 0x1ff;
+  
+  hw(0xbc200000) = (cpuNum << 16) | cpuDen;
+  hw(0xBC200004) = (busNum << 16) | busDen;
+  settle();
+    
+  const int step = 18;
+  while ((cpuNum & cpuDen & busNum & busDen) != 0x1ff) {
+    
+    const u32 nextCpuNum = cpuNum + step;
+    const u32 nextCpuDen = cpuDen + step;
+    const u32 nextBusNum = busNum + step;
+    const u32 nextBusDen = busDen + step;
+    
+    cpuNum = (nextCpuNum > 0x1ff) ? 0x1ff : nextCpuNum;
+    cpuDen = (nextCpuDen > 0x1ff) ? 0x1ff : nextCpuDen;
+    busNum = (nextBusNum > 0x1ff) ? 0x1ff : nextBusNum;
+    busDen = (nextBusDen > 0x1ff) ? 0x1ff : nextBusDen;
+    
+    hw(0xbc200000) = (cpuNum << 16) | cpuDen;
+    hw(0xBC200004) = (busNum << 16) | busDen;
+    settle();
+  }
+  
+  // hw(0xBC200008) = 511 << 16 | 511;
+}
+
+void adjustInitialFrequencies() {
+  
   sceKernelDelayThread(100);
 
   int intr, state;
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
 
-  u32 index = hw(0xbc100068) & 0x0f;
-  if (index < 5) {
-    
-    const u32 defaultNum = (u32)(((float)(DEFAULT_FREQUENCY * PLL_DEN)) / ((float)(PLL_BASE_FREQ * PLL_RATIO)));
-    hw(0xbc1000fc) = (PLL_MUL_MSB << 16) | (defaultNum << 8) | PLL_DEN;
-    sync();
-    
-    while (index <= 5) {
-      hw(0xbc100068) = 0x80 | index;
-      sync();  
-      do {
-        delayPipeline();
-      } while ((hw(0xbc100068) & 0x80));
-      settle();
-      index++;
-    }
-  }
-  
+  adjustPLLMultiplier();
+  adjustPLLRatio();
+  adjustDomainRatios();
+
   resumeCpuIntr(intr);
   sceKernelResumeDispatchThread(state);
 }
-  
+
 int _setOverclock() {
   
   sceKernelDelayThread(3000000);
@@ -129,8 +189,8 @@ int _setOverclock() {
 
   scePowerSetClockFrequency(DEFAULT_FREQUENCY, DEFAULT_FREQUENCY, DEFAULT_FREQUENCY/2);
   currFreq = DEFAULT_FREQUENCY;
-
-  rampUpPLLRatio();
+  
+  adjustInitialFrequencies();
   
   const int freqStep = 5;
   int defaultFreq = DEFAULT_FREQUENCY;
@@ -155,7 +215,6 @@ int _setOverclock() {
       updatePLLMultiplier(_num, PLL_MUL_MSB);
       _num++;
     }
-    
     settle();
     
     defaultFreq += freqStep;
@@ -182,20 +241,26 @@ void _cancelOverclock() {
   state = sceKernelSuspendDispatchThread();
   suspendCpuIntr(intr);
   
-  const u32 pllCtl = hw(0xbc100068);
-  const u32 pllMul = hw(0xbc1000fc);
+  const u32 pllCtl = hw(0xbc100068) & 0x0f;
+  const u32 pllMul = hw(0xbc1000fc) & 0xffff;
   sync();
   
+  resumeCpuIntr(intr);
+  sceKernelResumeDispatchThread(state);
+
   const float n = (float)((pllMul & 0xff00) >> 8);
   const float d = (float)((pllMul & 0x00ff));
   const float m = (d > 0.0f) ? (n / d) : 9.0f;
   const int overclocked = ((pllCtl & 5) && (m > 9.0f)) ? 1 : 0;
+  sceKernelDelayThread(1000);
   
   //const u32 pllMul = hw(0xbc1000fc); sync();
   //const int overclocked = pllMul & (1 << PLL_CUSTOM_FLAG);
-  
+    
   if (overclocked) {
-
+    state = sceKernelSuspendDispatchThread();
+    suspendCpuIntr(intr);
+    
     updatePLLControl();
 
     while (_num >= num) {
@@ -203,10 +268,11 @@ void _cancelOverclock() {
       _num--;
     }
     settle();
+    
+    resumeCpuIntr(intr);
+    sceKernelResumeDispatchThread(state);
   }
   
-  resumeCpuIntr(intr);
-  sceKernelResumeDispatchThread(state);
   stopped = 1;
   _dump();
 }
@@ -346,13 +412,13 @@ int main() {
     pspDebugScreenPrintf(" Test is %s            \n\n", stopped ? "STOPPED" : "RUNNING...");
     pspDebugScreenPrintf(" Ctrl: 0x%08x            \n", ctrl);
     pspDebugScreenPrintf(" Mult: 0x%08x            \n", mult);
-    
+
     {
       Vertex* const vertices = (Vertex*)sceGuGetMemory(sizeof(Vertex) * 2);
       move += dir;
-      if(move > 64) {
+      if(move > 112) {
         dir = -1;
-      } else if(move < -64) {
+      } else if(move < -112) {
         dir = 1;
       }
       vertices[0].color = 0;

@@ -97,14 +97,6 @@
     :                           \
     : "$t0", "memory"           \
   )
-
-// Set clock domains to ratio 1:1
-#define resetDomainRatios()          \
-  sync();                            \
-  hw(0xbc200000) = 511 << 16 | 511;  \
-  hw(0xBC200004) = 511 << 16 | 511;  \
-  hw(0xBC200008) = 511 << 16 | 511;  \
-  sync();
   
 static inline void _unlockMemory() {
   const u32 start = 0xbc000000;
