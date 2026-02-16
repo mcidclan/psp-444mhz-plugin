@@ -403,7 +403,7 @@ int main() {
     pspDebugScreenSetOffset(offset);
     
     pspDebugScreenSetXY(40, 0);
-    pspDebugScreenPrintf("Overclock Stress Tester v2.4");
+    pspDebugScreenPrintf("Overclock Stress Tester v2.5");
     
     pspDebugScreenSetXY(0, 0);
     pspDebugScreenPrintf(" FPS: %llu               \n", fps);

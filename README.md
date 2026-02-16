@@ -41,7 +41,7 @@ Unfortunately on 1000, the limit seems to already be reached at 370MHz on my sid
 Not tested.
 
 ### PSP Street (E1000)
-Not tested.
+Not supported yet.
 
 ## Build
 You can build the project using `./build.sh`. This will bundle all files into `./bin/build/` ready to be copied to the root of your Memory Stick.
@@ -54,6 +54,6 @@ The README.md files are automatically included in their respective directories s
 This project and code are provided as-is without warranty. Users assume full responsibility for any implementation or consequences. Use at your own discretion and risk
 
 ## Special Mention
-Thanks to re4thewin, z2442 and st1x51 for testing, and to koutsie whose claims about overclocking possibilities motivated me to investigate and experiment on the subject.
+Thanks to re4thewin, z2442, st1x51 and skinny for testing, and to koutsie whose claims about overclocking possibilities motivated me to investigate and experiment on the subject.
 
 *m-c/d*
